@@ -13,13 +13,9 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 	let D2 = QC.vector(x, y + w, z + w);
 
 	const allPoints = [A, B, C, D, A2, B2, C2, D2];
-	for (let point of allPoints) {
-		QC.offset(point, QC.origin, -1);
-		QC.rotXZ(point, QC.rotation.cosY, QC.rotation.sinY);
-		QC.rotYZ(point, QC.rotation.cosX, QC.rotation.sinX);
-		QC.offset(point, QC.origin);
-		QC.offset(point, QC.camera, -1);
-	}
+
+	//world transform
+	for (let point of allPoints) QC.worldTransform(point);
 
 	let mid = QC.middle(allPoints);
 	let zAvg = QC.sqrMag(mid);
@@ -53,6 +49,7 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 		QC.quad([D, A, A2, D2], medium, QCshadowMedium),
 		QC.quad([B, C, C2, B2], medium, QCshadowMedium)
 	];
+	//mask off invisible sides
 	const [front, back, top, bottom, left, right] = allSides;
 	if (!frontMask && QC.facingAway(front)) frontMask = true;
 	if (!backMask && QC.facingAway(back)) backMask = true;
@@ -61,10 +58,7 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 	if (!leftMask && QC.facingAway(left)) leftMask = true;
 	if (!rightMask && QC.facingAway(right)) rightMask = true;
 	
-
-	//facing away culling
-
-
+	//screen transform (project to screen)
 	for (let point of allPoints) QC.screenTransform(point);
 
 	//offscreen culling
@@ -73,7 +67,7 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 	if (mid2.x < -thresh || mid2.y < -thresh || mid2.x > QC.width + thresh || mid2.y > QC.height + thresh) return;
 
 
-	//filter sides
+	//mask sides
 	let sides = [];
 	if (!frontMask) sides.push(front);
 	if (!backMask) sides.push(back);
@@ -165,8 +159,10 @@ QC.drawQuad = quad => {
 	QC.c.lineTo(points[3].x, points[3].y);
 	QC.c.lineTo(points[0].x, points[0].y);
 	QC.c.fill();
+	// QC.c.strokeStyle = "black";
+	// QC.c.stroke();
 };
-QC.middle = (points) => {
+QC.middle = points => {
 	const acc = QC.vector(0, 0, 0);
 	const len = points.length;
 	for (let i = 0; i < points.length; i++) {
@@ -276,6 +272,12 @@ QC.skewImage = (image, a, c, d) => {
 	QC.c.drawImage(image, 0, 0, width, height);
 	QC.c.restore();
 }
+QC.worldToScreen = vec => {
+	let cvec = QC.vector(vec.x, vec.y, vec.z);
+	QC.worldTransform(cvec);
+	QC.screenTransform(cvec);
+	return cvec;
+};
 QC.lightT = 0;
 QC.mediumT = 0.4;
 QC.darkT = 0.8;
@@ -285,9 +287,16 @@ QC.submitMap = map => {
 QC.mapEntry = (exists, r, g, b) => ({ exists, r, g, b });
 QC.quad = (vertices, color, shadow) => ({ vertices, color, shadow });
 QC.vector = (x, y, z) => ({ x, y, z });
-QC.screenTransform = (res) => {
-	res.x = QC.halfWidth * res.x / res.z + QC.halfWidth;
-	res.y = QC.halfWidth * res.y / res.z + QC.halfHeight;
+QC.screenTransform = vec => {
+	vec.x = QC.halfWidth * vec.x / vec.z + QC.halfWidth;
+	vec.y = QC.halfWidth * vec.y / vec.z + QC.halfHeight;
+};
+QC.worldTransform = vec => {
+	QC.offset(vec, QC.origin, -1);
+	QC.rotXZ(vec, QC.rotation.cosY, QC.rotation.sinY);
+	QC.rotYZ(vec, QC.rotation.cosX, QC.rotation.sinX);
+	QC.offset(vec, QC.origin);
+	QC.offset(vec, QC.camera, -1);
 };
 QC.needsProcess = false;
 QC.config = ({ camera = QC.vector(0, 0, 0), context = null, cubeSize = 1, rotation = { cosX: 1, sinX: 0, cosY: 1, sinY: 0 }, origin = QC.vector(0, 0, 0), shadows = true, firstPerson = true }) => {
