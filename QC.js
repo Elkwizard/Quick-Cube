@@ -21,7 +21,7 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 	let zAvg = QC.sqrMag(mid);
 
 	//behind screen culling
-	if (mid.z < w * 2) return;
+	if (mid.z < 0) return;
 	QC.needsProcess = true;
 
 	//lighting and textures
@@ -178,6 +178,17 @@ QC.offset = (vec, vec2, d = 1) => {
 	vec.y += vec2.y * d;
 	vec.z += vec2.z * d;
 }
+QC.scale = (vec, scale) => QC.vector(vec.x * scale, vec.y * scale, vec.z * scale);
+QC.viewRay = () => {
+	let view = QC.vector(0, 0, 1);
+	QC.rotXZ(view, QC.rotation.cosY, -QC.rotation.sinY);
+	QC.rotYZ(view, QC.rotation.cosX, -QC.rotation.sinX);
+	return view;
+}
+QC.moveCamera = vec => {
+	QC.offset(QC.camera, vec);
+	if (QC.firstPerson) QC.offset(QC.origin, vec);
+};
 QC.rotXY = (vec, cos, sin) => {
 	let t_x = vec.x * cos - vec.y * sin;
 	let t_y = vec.x * sin + vec.y * cos;
@@ -271,7 +282,7 @@ QC.skewImage = (image, a, c, d) => {
 	QC.c.setTransform(t);
 	QC.c.drawImage(image, 0, 0, width, height);
 	QC.c.restore();
-}
+};
 QC.worldToScreen = vec => {
 	let cvec = QC.vector(vec.x, vec.y, vec.z);
 	QC.worldTransform(cvec);
@@ -288,8 +299,9 @@ QC.mapEntry = (exists, r, g, b) => ({ exists, r, g, b });
 QC.quad = (vertices, color, shadow) => ({ vertices, color, shadow });
 QC.vector = (x, y, z) => ({ x, y, z });
 QC.screenTransform = vec => {
-	vec.x = QC.halfWidth * vec.x / vec.z + QC.halfWidth;
-	vec.y = QC.halfWidth * vec.y / vec.z + QC.halfHeight;
+	let z = Math.max(0.01, vec.z);
+	vec.x = QC.halfWidth * vec.x / z + QC.halfWidth;
+	vec.y = QC.halfWidth * vec.y / z + QC.halfHeight;
 };
 QC.worldTransform = vec => {
 	QC.offset(vec, QC.origin, -1);
@@ -314,6 +326,7 @@ QC.config = ({ camera = QC.vector(0, 0, 0), context = null, cubeSize = 1, rotati
 		QC.height = QC.halfHeight * 2;
 		QC.shadows = shadows;
 		QC.firstPerson = firstPerson;
+		if (firstPerson) QC.origin = QC.vector(QC.camera.x, QC.camera.y, QC.camera.z);
 		QC.worldCubeSize = cubeSize * QC.halfWidth;
 	}
 };
