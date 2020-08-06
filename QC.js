@@ -181,8 +181,10 @@ QC.offset = (vec, vec2, d = 1) => {
 QC.scale = (vec, scale) => QC.vector(vec.x * scale, vec.y * scale, vec.z * scale);
 QC.viewRay = () => {
 	let view = QC.vector(0, 0, 1);
-	QC.rotXZ(view, QC.rotation.cosY, -QC.rotation.sinY);
-	QC.rotYZ(view, QC.rotation.cosX, -QC.rotation.sinX);
+	let aX = -Math.atan2(QC.rotation.sinX, QC.rotation.cosX);
+	let aY = -Math.atan2(QC.rotation.sinY, QC.rotation.cosY);
+	QC.rotXZ(view, Math.cos(aY), Math.sin(aY));
+	QC.rotYZ(view, Math.cos(aX), Math.sin(aX));
 	return view;
 }
 QC.moveCamera = vec => {
