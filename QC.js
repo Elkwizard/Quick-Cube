@@ -1,5 +1,26 @@
 const QC = {};
-QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, leftMask = false, rightMask = false, frontMask = false, backMask = false, lightT = QC.lightT, mediumT = QC.mediumT, darkT = QC.darkT) => {
+QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, leftMask = false, rightMask = false, frontMask = false, backMask = false) => {
+	//lighting and textures
+	let light, medium, dark;
+	let QCshadowLight, QCshadowMedium, QCshadowDark;
+	if (r instanceof Image) {
+		QCshadowLight = `rgba(0, 0, 0, ${QC.lightT})`;
+		QCshadowMedium = `rgba(0, 0, 0, ${QC.mediumT})`;
+		QCshadowDark = `rgba(0, 0, 0, ${QC.darkT})`;
+		light = r;
+		medium = g;
+		dark = b;
+	} else {
+		light = `rgb(${r * (1 - QC.lightT)}, ${g * (1 - QC.lightT)}, ${b * (1 - QC.lightT)})`;
+		medium = `rgb(${r * (1 - QC.mediumT)}, ${g * (1 - QC.mediumT)}, ${b * (1 - QC.mediumT)})`;
+		dark = `rgb(${r * (1 - QC.darkT)}, ${g * (1 - QC.darkT)}, ${b * (1 - QC.darkT)})`;
+	}
+
+	//color processing done
+	QC.colorBakedCube(x, y, z, light, medium, dark, QCshadowLight, QCshadowMedium, QCshadowDark, topMask, bottomMask, leftMask, rightMask, frontMask, backMask);
+}
+QC.batch = [];
+QC.colorBakedCube = (x, y, z, light, medium, dark, QCshadowLight, QCshadowMedium, QCshadowDark, topMask, bottomMask, leftMask, rightMask, frontMask, backMask) => {
 	const w = QC.cubeSize;
 	//front
 	let A = QC.vector(x, y, z);
@@ -15,7 +36,7 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 	const allPoints = [A, B, C, D, A2, B2, C2, D2];
 
 	//world transform
-	for (let point of allPoints) QC.worldTransform(point);
+	for (let i = 0; i < 8; i++) QC.worldTransform(allPoints[i]);
 
 	let mid = QC.middle(allPoints);
 	let zAvg = QC.sqrMag(mid);
@@ -23,23 +44,7 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 	//behind screen culling
 	if (mid.z < 0) return;
 	QC.needsProcess = true;
-
-	//lighting and textures
-	let light, medium, dark;
-	let QCshadowLight, QCshadowMedium, QCshadowDark;
-	if (r instanceof Image) {
-		QCshadowLight = `rgba(0, 0, 0, ${lightT})`;
-		QCshadowMedium = `rgba(0, 0, 0, ${mediumT})`;
-		QCshadowDark = `rgba(0, 0, 0, ${darkT})`;
-		light = r;
-		medium = g;
-		dark = b;
-	} else {
-		light = `rgb(${r * (1 - lightT)}, ${g * (1 - lightT)}, ${b * (1 - lightT)})`;
-		medium = `rgb(${r * (1 - mediumT)}, ${g * (1 - mediumT)}, ${b * (1 - mediumT)})`;
-		dark = `rgb(${r * (1 - darkT)}, ${g * (1 - darkT)}, ${b * (1 - darkT)})`;
-	}
-
+	
 	//construct sides
 	const allSides = [
 		QC.quad([D, C, B, A], medium, QCshadowMedium),
@@ -59,7 +64,7 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 	if (!rightMask && QC.facingAway(right)) rightMask = true;
 	
 	//screen transform (project to screen)
-	for (let point of allPoints) QC.screenTransform(point);
+	for (let i = 0; i < allPoints.length; i++) QC.screenTransform(allPoints[i]);
 
 	//offscreen culling
 	let mid2 = QC.middle(allPoints);
@@ -77,8 +82,7 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 	if (!rightMask) sides.push(right);
 	const cube = { z: zAvg, sides };
 	QC.batch.push(cube);
-}
-QC.batch = [];
+};
 QC.sqrMag = vec => vec.x ** 2 + vec.y ** 2 + vec.z ** 2;
 QC.setRotX = angle => [QC.rotation.cosX, QC.rotation.sinX] = [Math.cos(angle), Math.sin(angle)];
 QC.setRotY = angle => [QC.rotation.cosY, QC.rotation.sinY] = [Math.cos(angle), Math.sin(angle)];
@@ -86,30 +90,35 @@ QC.facingAway = quad => {
 	//get vectors
 	let [vecA, vecB, vecD, vecC] = quad.vertices;
 	
-	//vector from A to B
-	let dxA = vecB.x - vecA.x;
-	let dyA = vecB.y - vecA.y;
-	let dzA = vecB.z - vecA.z;
+	// -- actual operations --
+	// //vector from A to B
+	// let dxA = vecB.x - vecA.x;
+	// let dyA = vecB.y - vecA.y;
+	// let dzA = vecB.z - vecA.z;
 
-	//vector to from C to B
-	let dxC = vecB.x - vecC.x;
-	let dyC = vecB.y - vecC.y;
-	let dzC = vecB.z - vecC.z;
+	// //vector to from C to B
+	// let dxC = vecB.x - vecC.x;
+	// let dyC = vecB.y - vecC.y;
+	// let dzC = vecB.z - vecC.z;
 
-	//middle of quad
-	let mX = (vecA.x + vecB.x + vecC.x + vecD.x) / 4;
-	let mY = (vecA.y + vecB.y + vecC.y + vecD.y) / 4;
-	let mZ = (vecA.z + vecB.z + vecC.z + vecD.z) / 4;
+	// //middle of quad
+	// let mX = (vecA.x + vecB.x + vecC.x + vecD.x) / 4;
+	// let mY = (vecA.y + vecB.y + vecC.y + vecD.y) / 4;
+	// let mZ = (vecA.z + vecB.z + vecC.z + vecD.z) / 4;
 
-	//normal of quad (A->B x C->B)
-	let nX = dyA * dzC - dzA * dyC;
-	let nY = dzA * dxC - dxA * dzC;
-	let nZ = dxA * dyC - dyA * dxC;
+	// //normal of quad (A->B x C->B)
+	// let nX = dyA * dzC - dzA * dyC;
+	// let nY = dzA * dxC - dxA * dzC;
+	// let nZ = dxA * dyC - dyA * dxC;
 
-	//dot of n x c
-	let dot = mX * nX + mY * nY + mZ * nZ;
+	// //dot of n x c
+	// let dot = mX * nX + mY * nY + mZ * nZ;
 
-	return dot <= 0;
+	// return dot <= 0;
+
+	
+	//minified
+	return ((vecA.x + vecC.x) / 2) * ((vecB.y - vecA.y) * (vecB.z - vecC.z) - (vecB.z - vecA.z) * (vecB.y - vecC.y)) + ((vecA.y + vecC.y) / 2) * ((vecB.z - vecA.z) * (vecB.x - vecC.x) - (vecB.x - vecA.x) * (vecB.z - vecC.z)) + ((vecA.z + vecC.z) / 2) * ((vecB.x - vecA.x) * (vecB.y - vecC.y) - (vecB.y - vecA.y) * (vecB.x - vecC.x)) <= 0;
 };
 QC.mouseRotate = (x, y) => {
 	QC.needsProcess = true;
@@ -159,6 +168,7 @@ QC.drawQuad = quad => {
 	QC.c.lineTo(points[3].x, points[3].y);
 	QC.c.lineTo(points[0].x, points[0].y);
 	QC.c.fill();
+
 	// QC.c.strokeStyle = "black";
 	// QC.c.stroke();
 };
@@ -181,10 +191,12 @@ QC.offset = (vec, vec2, d = 1) => {
 QC.scale = (vec, scale) => QC.vector(vec.x * scale, vec.y * scale, vec.z * scale);
 QC.viewRay = () => {
 	let view = QC.vector(0, 0, 1);
-	let aX = -Math.atan2(QC.rotation.sinX, QC.rotation.cosX);
-	let aY = -Math.atan2(QC.rotation.sinY, QC.rotation.cosY);
-	QC.rotXZ(view, Math.cos(aY), Math.sin(aY));
-	QC.rotYZ(view, Math.cos(aX), Math.sin(aX));
+	if (QC.firstPerson) {
+		let aX = -Math.atan2(QC.rotation.sinX, QC.rotation.cosX);
+		let aY = -Math.atan2(QC.rotation.sinY, QC.rotation.cosY);
+		QC.rotYZ(view, Math.cos(aX), Math.sin(aX));
+		QC.rotXZ(view, Math.cos(aY), Math.sin(aY));
+	}
 	return view;
 }
 QC.moveCamera = vec => {
@@ -250,6 +262,8 @@ QC.processMap = (map, offset = QC.vector(0, 0, 0)) => {
 				let { exists, r, g, b } = cube;
 				if (!exists) continue;
 				let masks = cube.masks;
+				
+				//find obstructions for shadow casting
 				let shadow = false;
 				if (QC.shadows) if (j > 2) for (let w = j - 1; w >= 0; w--) {
 					if (map[i][w][k].exists) {
@@ -258,7 +272,25 @@ QC.processMap = (map, offset = QC.vector(0, 0, 0)) => {
 						break;
 					}
 				}
-				calls.push([i * scale + ox, j * scale + oy, k * scale + oz, r, g, b, ...masks, shadow ? 0.5 : QC.lightT, QC.mediumT, QC.darkT]);
+
+				//baking lighting and textures
+				let lightT = shadow ? QC.shadowT : QC.lightT;
+				let light, medium, dark;
+				let QCshadowLight, QCshadowMedium, QCshadowDark;
+				if (r instanceof Image) {
+					QCshadowLight = `rgba(0, 0, 0, ${lightT})`;
+					QCshadowMedium = `rgba(0, 0, 0, ${QC.mediumT})`;
+					QCshadowDark = `rgba(0, 0, 0, ${QC.darkT})`;
+					light = r;
+					medium = g;
+					dark = b;
+				} else {
+					light = `rgb(${r * (1 - lightT)}, ${g * (1 - lightT)}, ${b * (1 - lightT)})`;
+					medium = `rgb(${r * (1 - QC.mediumT)}, ${g * (1 - QC.mediumT)}, ${b * (1 - QC.mediumT)})`;
+					dark = `rgb(${r * (1 - QC.darkT)}, ${g * (1 - QC.darkT)}, ${b * (1 - QC.darkT)})`;
+				}
+
+				calls.push([i * scale + ox, j * scale + oy, k * scale + oz, light, medium, dark, QCshadowLight, QCshadowMedium, QCshadowDark, ...masks]);
 			}
 	return calls;
 };
@@ -292,10 +324,14 @@ QC.worldToScreen = vec => {
 	return cvec;
 };
 QC.lightT = 0;
+QC.shadowT = 0.5;
 QC.mediumT = 0.4;
 QC.darkT = 0.8;
 QC.submitMap = map => {
-	for (let i = 0; i < map.length; i++) QC.cube(...map[i]);
+	for (let i = 0; i < map.length; i++) {
+		let m = map[i];
+		QC.colorBakedCube(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10], m[11], m[12], m[13], m[14]);
+	}
 };
 QC.mapEntry = (exists, r, g, b) => ({ exists, r, g, b });
 QC.quad = (vertices, color, shadow) => ({ vertices, color, shadow });
