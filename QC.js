@@ -349,7 +349,7 @@ QC.worldTransform = vec => {
 	QC.offset(vec, QC.camera, -1);
 };
 QC.needsProcess = false;
-QC.config = ({ camera = QC.vector(0, 0, 0), context = null, cubeSize = 1, rotation = { cosX: 1, sinX: 0, cosY: 1, sinY: 0 }, origin = QC.vector(0, 0, 0), shadows = true, firstPerson = true }) => {
+QC.config = ({ camera = QC.vector(0, 0, 0), context = null, cubeSize = 1, rotation = { cosX: 1, sinX: 0, cosY: 1, sinY: 0 }, origin = QC.vector(0, 0, 0), shadows = true, firstPerson = false }) => {
 	if (!context) {
 		throw new Error("No Context Provided");
 	} else {
