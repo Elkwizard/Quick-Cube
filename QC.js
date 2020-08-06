@@ -1,4 +1,4 @@
-const QC = { };
+const QC = {};
 QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, leftMask = false, rightMask = false, frontMask = false, backMask = false, lightT = QC.lightT, mediumT = QC.mediumT, darkT = QC.darkT) => {
 	const w = QC.cubeSize;
 	//front
@@ -24,11 +24,11 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 	let mid = QC.middle(allPoints);
 	let zAvg = QC.sqrMag(mid);
 
+	//behind screen culling
 	if (mid.z < w * 2) return;
 	QC.needsProcess = true;
 
-	for (let point of allPoints) QC.screenTransform(point);
-
+	//lighting and textures
 	let light, medium, dark;
 	let QCshadowLight, QCshadowMedium, QCshadowDark;
 	if (r instanceof Image) {
@@ -43,13 +43,44 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 		medium = `rgb(${r * (1 - mediumT)}, ${g * (1 - mediumT)}, ${b * (1 - mediumT)})`;
 		dark = `rgb(${r * (1 - darkT)}, ${g * (1 - darkT)}, ${b * (1 - darkT)})`;
 	}
+
+	//construct sides
+	const allSides = [
+		QC.quad([D, C, B, A], medium, QCshadowMedium),
+		QC.quad([A2, B2, C2, D2], medium, QCshadowMedium),
+		QC.quad([A, B, B2, A2], light, QCshadowLight),
+		QC.quad([C, D, D2, C2], dark, QCshadowDark),
+		QC.quad([D, A, A2, D2], medium, QCshadowMedium),
+		QC.quad([B, C, C2, B2], medium, QCshadowMedium)
+	];
+	const [front, back, top, bottom, left, right] = allSides;
+	if (!frontMask && QC.facingAway(front)) frontMask = true;
+	if (!backMask && QC.facingAway(back)) backMask = true;
+	if (!topMask && QC.facingAway(top)) topMask = true;
+	if (!bottomMask && QC.facingAway(bottom)) bottomMask = true;
+	if (!leftMask && QC.facingAway(left)) leftMask = true;
+	if (!rightMask && QC.facingAway(right)) rightMask = true;
+	
+
+	//facing away culling
+
+
+	for (let point of allPoints) QC.screenTransform(point);
+
+	//offscreen culling
+	let mid2 = QC.middle(allPoints);
+	let thresh = QC.worldCubeSize;
+	if (mid2.x < -thresh || mid2.y < -thresh || mid2.x > QC.width + thresh || mid2.y > QC.height + thresh) return;
+
+
+	//filter sides
 	let sides = [];
-	if (!frontMask) sides.push(QC.quad([A, B, C, D], medium, QCshadowMedium)); 
-	if (!backMask) sides.push(QC.quad([A2, B2, C2, D2], medium, QCshadowMedium));
-	if (!topMask) sides.push(QC.quad([A, B, B2, A2], light, QCshadowLight));
-	if (!bottomMask) sides.push(QC.quad([C, D, D2, C2], dark, QCshadowDark));
-	if (!leftMask) sides.push(QC.quad([D, A, A2, D2], medium, QCshadowMedium));
-	if (!rightMask) sides.push(QC.quad([B, C, C2, B2], medium, QCshadowMedium));
+	if (!frontMask) sides.push(front);
+	if (!backMask) sides.push(back);
+	if (!topMask) sides.push(top);
+	if (!bottomMask) sides.push(bottom);
+	if (!leftMask) sides.push(left);
+	if (!rightMask) sides.push(right);
 	const cube = { z: zAvg, sides };
 	QC.batch.push(cube);
 }
@@ -57,6 +88,35 @@ QC.batch = [];
 QC.sqrMag = vec => vec.x ** 2 + vec.y ** 2 + vec.z ** 2;
 QC.setRotX = angle => [QC.rotation.cosX, QC.rotation.sinX] = [Math.cos(angle), Math.sin(angle)];
 QC.setRotY = angle => [QC.rotation.cosY, QC.rotation.sinY] = [Math.cos(angle), Math.sin(angle)];
+QC.facingAway = quad => {
+	//get vectors
+	let [vecA, vecB, vecD, vecC] = quad.vertices;
+	
+	//vector from A to B
+	let dxA = vecB.x - vecA.x;
+	let dyA = vecB.y - vecA.y;
+	let dzA = vecB.z - vecA.z;
+
+	//vector to from C to B
+	let dxC = vecB.x - vecC.x;
+	let dyC = vecB.y - vecC.y;
+	let dzC = vecB.z - vecC.z;
+
+	//middle of quad
+	let mX = (vecA.x + vecB.x + vecC.x + vecD.x) / 4;
+	let mY = (vecA.y + vecB.y + vecC.y + vecD.y) / 4;
+	let mZ = (vecA.z + vecB.z + vecC.z + vecD.z) / 4;
+
+	//normal of quad (A->B x C->B)
+	let nX = dyA * dzC - dzA * dyC;
+	let nY = dzA * dxC - dxA * dzC;
+	let nZ = dxA * dyC - dyA * dxC;
+
+	//dot of n x c
+	let dot = mX * nX + mY * nY + mZ * nZ;
+
+	return dot <= 0;
+};
 QC.mouseRotate = (x, y) => {
 	QC.needsProcess = true;
 	if (QC.firstPerson) {
@@ -157,7 +217,7 @@ QC.processMap = (map, offset = QC.vector(0, 0, 0)) => {
 			for (let k = 0; k < depth; k++) {
 				if (map[i][j][k].exists) {
 					let leftMask = get(i - 1, j, k);
-					let rightMask =	get(i + 1, j, k);
+					let rightMask = get(i + 1, j, k);
 					let topMask = get(i, j - 1, k);
 					let bottomMask = get(i, j + 1, k);
 					let frontMask = get(i, j, k - 1);
@@ -166,7 +226,7 @@ QC.processMap = (map, offset = QC.vector(0, 0, 0)) => {
 						nMap[i][j].push(QC.mapEntry(false));
 						continue;
 					}
-					
+
 					let cube = map[i][j][k];
 					cube.masks = [topMask, bottomMask, leftMask, rightMask, frontMask, backMask];
 					nMap[i][j].push(cube);
@@ -245,5 +305,6 @@ QC.config = ({ camera = QC.vector(0, 0, 0), context = null, cubeSize = 1, rotati
 		QC.height = QC.halfHeight * 2;
 		QC.shadows = shadows;
 		QC.firstPerson = firstPerson;
+		QC.worldCubeSize = cubeSize * QC.halfWidth;
 	}
 };
