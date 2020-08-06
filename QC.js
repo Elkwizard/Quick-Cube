@@ -29,16 +29,27 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 
 	for (let point of allPoints) QC.screenTransform(point);
 
-	let light = `rgb(${r * (1 - lightT)}, ${g * (1 - lightT)}, ${b * (1 - lightT)})`;
-	let medium = `rgb(${r * (1 - mediumT)}, ${g * (1 - mediumT)}, ${b * (1 - mediumT)})`;
-	let dark = `rgb(${r * (1 - darkT)}, ${g * (1 - darkT)}, ${b * (1 - darkT)})`;
+	let light, medium, dark;
+	let QCshadowLight, QCshadowMedium, QCshadowDark;
+	if (r instanceof Image) {
+		QCshadowLight = `rgba(0, 0, 0, ${lightT})`;
+		QCshadowMedium = `rgba(0, 0, 0, ${mediumT})`;
+		QCshadowDark = `rgba(0, 0, 0, ${darkT})`;
+		light = r;
+		medium = g;
+		dark = b;
+	} else {
+		light = `rgb(${r * (1 - lightT)}, ${g * (1 - lightT)}, ${b * (1 - lightT)})`;
+		medium = `rgb(${r * (1 - mediumT)}, ${g * (1 - mediumT)}, ${b * (1 - mediumT)})`;
+		dark = `rgb(${r * (1 - darkT)}, ${g * (1 - darkT)}, ${b * (1 - darkT)})`;
+	}
 	let sides = [];
-	if (!frontMask) sides.push(QC.quad([A, B, C, D], medium)); 
-	if (!backMask) sides.push(QC.quad([A2, B2, C2, D2], medium));
-	if (!topMask) sides.push(QC.quad([A, B, B2, A2], light));
-	if (!bottomMask) sides.push(QC.quad([C, D, D2, C2], dark));
-	if (!leftMask) sides.push(QC.quad([D, A, A2, D2], medium));
-	if (!rightMask) sides.push(QC.quad([B, C, C2, B2], medium));
+	if (!frontMask) sides.push(QC.quad([A, B, C, D], medium, QCshadowMedium)); 
+	if (!backMask) sides.push(QC.quad([A2, B2, C2, D2], medium, QCshadowMedium));
+	if (!topMask) sides.push(QC.quad([A, B, B2, A2], light, QCshadowLight));
+	if (!bottomMask) sides.push(QC.quad([C, D, D2, C2], dark, QCshadowDark));
+	if (!leftMask) sides.push(QC.quad([D, A, A2, D2], medium, QCshadowMedium));
+	if (!rightMask) sides.push(QC.quad([B, C, C2, B2], medium, QCshadowMedium));
 	const cube = { z: zAvg, sides };
 	QC.batch.push(cube);
 }
@@ -82,8 +93,12 @@ QC.clear = () => {
 QC.drawQuad = quad => {
 	let points = quad.vertices;
 	let color = quad.color;
-	QC.c.beginPath();
+	if (color.src) {
+		QC.skewImage(color, points[1], points[2], points[3]);
+		color = quad.shadow;
+	}
 	QC.c.fillStyle = color;
+	QC.c.beginPath();
 	QC.c.moveTo(points[0].x, points[0].y);
 	QC.c.lineTo(points[1].x, points[1].y);
 	QC.c.lineTo(points[2].x, points[2].y);
@@ -177,6 +192,29 @@ QC.processMap = (map, offset = QC.vector(0, 0, 0)) => {
 				calls.push([i * scale + ox, j * scale + oy, k * scale + oz, r, g, b, ...masks, shadow ? 0.5 : QC.lightT, QC.mediumT, QC.darkT]);
 			}
 	return calls;
+};
+QC.skewImage = (image, a, c, d) => {
+	let width = (d.x - c.x) || 0.1;
+	let height = (c.y - a.y) || 0.1;
+	let sw = Math.sign(width);
+	let sh = Math.sign(height);
+	width = Math.abs(width);
+	height = Math.abs(height);
+	let x = a.x;
+	let y = a.y;
+	let skewX = (c.x - a.x) / height;
+	let skewY = (d.y - c.y) / width;
+
+	QC.c.save();
+	QC.c.translate(x, y);
+	let t = QC.c.getTransform();
+	t.b = skewY || 0;
+	t.c = skewX || 0;
+	t.a = sw;
+	t.d = sh;
+	QC.c.setTransform(t);
+	QC.c.drawImage(image, 0, 0, width, height);
+	QC.c.restore();
 }
 QC.lightT = 0;
 QC.mediumT = 0.4;
@@ -185,7 +223,7 @@ QC.submitMap = map => {
 	for (let i = 0; i < map.length; i++) QC.cube(...map[i]);
 };
 QC.mapEntry = (exists, r, g, b) => ({ exists, r, g, b });
-QC.quad = (vertices, color) => ({ vertices, color });
+QC.quad = (vertices, color, shadow) => ({ vertices, color, shadow });
 QC.vector = (x, y, z) => ({ x, y, z });
 QC.screenTransform = (res) => {
 	res.x = QC.halfWidth * res.x / res.z + QC.halfWidth;
