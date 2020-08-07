@@ -18,7 +18,7 @@ QC.cube = (x, y, z, r = 255, g = 0, b = 0, topMask = false, bottomMask = false, 
 
 	//color processing done
 	QC.colorBakedCube(x, y, z, light, medium, dark, QCshadowLight, QCshadowMedium, QCshadowDark, topMask, bottomMask, leftMask, rightMask, frontMask, backMask);
-}
+};
 QC.batch = [];
 QC.colorBakedCube = (x, y, z, light, medium, dark, QCshadowLight, QCshadowMedium, QCshadowDark, topMask, bottomMask, leftMask, rightMask, frontMask, backMask) => {
 	const w = QC.cubeSize;
@@ -182,13 +182,17 @@ QC.middle = points => {
 		acc.z += p.z / len;
 	}
 	return acc;
-}
+};
 QC.offset = (vec, vec2, d = 1) => {
 	vec.x += vec2.x * d;
 	vec.y += vec2.y * d;
 	vec.z += vec2.z * d;
-}
-QC.scale = (vec, scale) => QC.vector(vec.x * scale, vec.y * scale, vec.z * scale);
+};
+QC.scale = (vec, scale) => {
+	vec.x *= scale;
+	vec.y *= scale;
+	vec.z *= scale;
+};
 QC.viewRay = () => {
 	let view = QC.vector(0, 0, 1);
 	if (QC.firstPerson) {
@@ -198,7 +202,7 @@ QC.viewRay = () => {
 		QC.rotXZ(view, Math.cos(aY), Math.sin(aY));
 	}
 	return view;
-}
+};
 QC.moveCamera = vec => {
 	QC.offset(QC.camera, vec);
 	if (QC.firstPerson) QC.offset(QC.origin, vec);
@@ -349,7 +353,7 @@ QC.worldTransform = vec => {
 	QC.offset(vec, QC.camera, -1);
 };
 QC.needsProcess = false;
-QC.config = ({ camera = QC.vector(0, 0, 0), context = null, cubeSize = 1, rotation = { cosX: 1, sinX: 0, cosY: 1, sinY: 0 }, origin = QC.vector(0, 0, 0), shadows = true, firstPerson = false }) => {
+QC.config = ({ camera = QC.vector(0, 0, 0), context = QC.context, cubeSize = 1, rotation = { cosX: 1, sinX: 0, cosY: 1, sinY: 0 }, origin = QC.vector(0, 0, 0), shadows = true, firstPerson = false }) => {
 	if (!context) {
 		throw new Error("No Context Provided");
 	} else {
