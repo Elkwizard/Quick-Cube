@@ -265,7 +265,7 @@ QC.processMap = (map, offset = QC.vector(0, 0, 0)) => {
 				
 				//find obstructions for shadow casting
 				let shadow = false;
-				if (QC.shadows) if (j > 2) for (let w = j - 1; w >= 0; w--) {
+				if (QC.shadows && !masks[0]) if (j > 2) for (let w = j - 1; w >= 0; w--) {
 					if (map[i][w][k].exists) {
 						shadow = true;
 						if (w === j - 1) shadow = false;
